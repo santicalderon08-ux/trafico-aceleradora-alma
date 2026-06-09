@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Aceleradora ALMA</title>
+<style>
+  :root {
+    --bg: #1a120b;
+    --surface: #241a10;
+    --surface-2: #2f2316;
+    --border: rgba(221,193,151,0.14);
+    --border-2: rgba(221,193,151,0.28);
+    --text: #f0e6d6;
+    --text-2: #bfa884;
+    --text-3: #8a7458;
+    --brown: #5C3D17;
+    --sand: #DDC197;
+    --gold: #C39A56;
+    --brown-mid: #8B6B3A;
+    --green: #9bbf6a;
+    --amber: #d6a93f;
+    --red: #d97b6c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 940px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--border);
+    flex-wrap: wrap; gap: 12px;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; color: var(--sand); letter-spacing: 0.02em; }
+  .header .sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .status { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.live { background: var(--green); animation: pulse 2s infinite; }
+  .dot.wait { background: var(--amber); }
+  .dot.err { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+  .main-nav { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .nav-btn {
+    font-size: 14px; padding: 10px 18px; border: none; background: transparent;
+    color: var(--text-2); cursor: pointer; font-family: inherit;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s;
+  }
+  .nav-btn:hover { color: var(--text); }
+  .nav-btn.active { color: var(--sand); border-bottom-color: var(--gold); font-weight: 500; }
+
+  .range { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  .rb {
+    font-size: 13px; padding: 7px 15px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-2); cursor: pointer; font-family: inherit; transition: all 0.15s;
+  }
+  .rb:hover { background: var(--surface); }
+  .rb.active { background: var(--gold); color: #2a1c0a; border-color: var(--gold); font-weight: 600; }
+
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .metric .label { font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
+  .metric .value { font-size: 26px; font-weight: 600; color: var(--sand); }
+
+  .section-label {
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label .bdot { width: 10px; height: 10px; border-radius: 3px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 28px; }
+  .chart-wrap { position: relative; width: 100%; height: 260px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { color: var(--text-2); font-weight: 500; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .bar-bg { background: var(--surface-2); border-radius: 4px; height: 7px; width: 100%; }
+  .bar-fill { background: var(--gold); border-radius: 4px; height: 7px; transition: width 0.4s; }
+
+  .step { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; }
+  .step-info { min-width: 0; }
+  .step-name { font-size: 14px; font-weight: 500; }
+  .step-path { font-size: 12px; color: var(--text-3); font-family: ui-monospace, monospace; }
+  .step-num { text-align: right; }
+  .step-users { font-size: 22px; font-weight: 600; line-height: 1; color: var(--sand); }
+  .step-users-lbl { font-size: 11px; color: var(--text-2); }
+  .step-bar-wrap { grid-column: 1 / -1; }
+  .step-bar-bg { background: var(--surface-2); border-radius: 4px; height: 8px; width: 100%; overflow: hidden; }
+  .step-bar-fill { border-radius: 4px; height: 8px; transition: width 0.5s; }
+  .conv-row { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 3px 0 7px; font-size: 12px; color: var(--text-2); }
+  .conv-pill { padding: 2px 10px; border-radius: 8px; font-weight: 600; font-size: 12px; }
+  .conv-good { background: rgba(155,191,106,0.18); color: #b8d98a; }
+  .conv-mid { background: rgba(214,169,63,0.18); color: #e3c069; }
+  .conv-low { background: rgba(217,123,108,0.18); color: #e89a8d; }
+
+  .outcome-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 6px; }
+  .oc { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid; border-radius: 0 10px 10px 0; padding: 14px 16px; }
+  .oc-lbl { font-size: 12px; color: var(--text-2); margin-bottom: 5px; }
+  .oc-val { font-size: 22px; font-weight: 600; color: var(--sand); }
+
+  .empty { text-align: center; color: var(--text-3); padding: 32px 16px; font-size: 14px; }
+  .note { font-size: 12px; color: var(--text-3); margin-top: 16px; line-height: 1.6; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .footer { margin-top: 40px; text-align: center; font-size: 12px; color: var(--text-3); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <h1>Aceleradora ALMA</h1>
+      <div class="sub">Dashboard de tráfico y conversión · GA4</div>
+    </div>
+    <div class="status">
+      <span class="dot wait" id="status-dot"></span>
+      <span id="status-text">Conectando…</span>
+    </div>
+  </div>
+
+  <div class="main-nav">
+    <button class="nav-btn active" data-view="trafico">Tráfico general</button>
+    <button class="nav-btn" data-view="funnel">Funnel de conversión</button>
+  </div>
+
+  <div id="view-trafico">
+    <div class="range" id="range-trafico">
+      <button class="rb active" data-start="today">Hoy</button>
+      <button class="rb" data-start="7daysAgo">7 días</button>
+      <button class="rb" data-start="30daysAgo">30 días</button>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><div class="label">Usuarios</div><div class="value" id="m-users">—</div></div>
+      <div class="metric"><div class="label">Sesiones</div><div class="value" id="m-sessions">—</div></div>
+      <div class="metric"><div class="label">Vistas de página</div><div class="value" id="m-views">—</div></div>
+      <div class="metric"><div class="label">Duración prom.</div><div class="value" id="m-duration">—</div></div>
+    </div>
+
+    <div class="section-label">Vistas por página</div>
+    <div class="chart-card"><div class="chart-wrap"><canvas id="chartPaginas"></canvas></div></div>
+
+    <div class="section-label">Detalle por página</div>
+    <div class="chart-card">
+      <table>
+        <thead><tr><th>Página</th><th style="text-align:right;">Vistas</th><th style="width:120px;">Tráfico</th></tr></thead>
+        <tbody id="pages-body"><tr><td colspan="3" class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="view-funnel" class="hidden">
+    <div class="range" id="range-funnel">
+      <button class="rb" data-start="today">Hoy</button>
+      <button class="rb active" data-start="7daysAgo">7 días</button>
+      <button class="rb" data-start="30daysAgo">30 días</button>
+      <button class="rb" data-start="90daysAgo">90 días</button>
+    </div>
+
+    <div class="section-label"><span class="bdot" style="background:var(--gold);"></span>Ruta 1 · Aceleradora</div>
+    <div id="branch-1"></div>
+
+    <div class="section-label" style="margin-top:24px;"><span class="bdot" style="background:var(--brown-mid);"></span>Ruta 2 · Masterclass</div>
+    <div id="branch-2"></div>
+
+    <div class="section-label" style="margin-top:24px;"><span class="bdot" style="background:var(--green);"></span>Resultados finales</div>
+    <div class="outcome-grid" id="outcomes"></div>
+
+    <div class="note" id="funnel-note"></div>
+  </div>
+
+  <div class="footer">Se actualiza automáticamente cada 60 segundos · Aceleradora ALMA</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const API_KEY = 'AIzaSyBInBDSk9grRk9qZXVilzJOmz64Xwz7paQ';
+const PROPERTY_ID = '446634947';
+
+const PATHS = {
+  home: '/',
+  acel: '/ruta-aceleradora',
+  form: '/ruta-formulario',
+  califica: '/ruta-califica',
+  nocalifica: '/ruta-no-califica',
+  master: '/ruta-masterclass',
+  ventamaster: '/ruta-venta-masterclass',
+  compra: '/ruta-confirmacion-compra-13usd'
+};
+
+let charts = {};
+let currentTraficoStart = 'today';
+let currentFunnelStart = '7daysAgo';
+
+function setStatus(type, text) {
+  document.getElementById('status-dot').className = 'dot ' + type;
+  document.getElementById('status-text').textContent = text;
+}
+
+async function runReport(body) {
+  const url = 'https://analyticsdata.googleapis.com/v1beta/properties/' + PROPERTY_ID + ':runReport?key=' + API_KEY;
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return res.json();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('view-trafico').classList.toggle('hidden', view !== 'trafico');
+    document.getElementById('view-funnel').classList.toggle('hidden', view !== 'funnel');
+    if (view === 'trafico') loadTrafico(currentTraficoStart);
+    else loadFunnel(currentFunnelStart);
+  });
+});
+
+document.querySelectorAll('#range-trafico .rb').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#range-trafico .rb').forEach(b => b.classList.toggle('active', b === btn));
+    currentTraficoStart = btn.dataset.start;
+    loadTrafico(currentTraficoStart);
+  });
+});
+
+document.querySelectorAll('#range-funnel .rb').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#range-funnel .rb').forEach(b => b.classList.toggle('active', b === btn));
+    currentFunnelStart = btn.dataset.start;
+    loadFunnel(currentFunnelStart);
+  });
+});
+
+async function loadTrafico(startDate) {
+  setStatus('wait', 'Cargando…');
+  try {
+    const data = await runReport({
+      dateRanges: [{ startDate: startDate, endDate: 'today' }],
+      dimensions: [{ name: 'pagePath' }],
+      metrics: [{name:'activeUsers'},{name:'sessions'},{name:'screenPageViews'},{name:'averageSessionDuration'}],
+      limit: 20
+    });
+    if (data.error) { setStatus('err', 'Error de conexión'); return; }
+
+    let tU=0,tS=0,tV=0,tD=0; const pages=[];
+    (data.rows || []).forEach(r => {
+      const u=+r.metricValues[0].value, s=+r.metricValues[1].value, v=+r.metricValues[2].value, d=+r.metricValues[3].value;
+      tU+=u; tS+=s; tV+=v; tD+=d;
+      pages.push({ page: r.dimensionValues[0].value, views: v });
+    });
+
+    const avgD = tS > 0 ? tD/tS : 0;
+    document.getElementById('m-users').textContent = tU.toLocaleString('es-CO');
+    document.getElementById('m-sessions').textContent = tS.toLocaleString('es-CO');
+    document.getElementById('m-views').textContent = tV.toLocaleString('es-CO');
+    document.getElementById('m-duration').textContent = Math.floor(avgD/60) + 'm ' + Math.round(avgD%60) + 's';
+
+    if (pages.length === 0) {
+      setStatus('wait', 'Sin datos aún (GA4 procesa en 24-48h)');
+      document.getElementById('pages-body').innerHTML = '<tr><td colspan="3" class="empty">GA4 todavía no tiene datos. Vuelve en unas horas.</td></tr>';
+    } else {
+      setStatus('live', 'Conectado en vivo');
+      renderTabla(pages);
+      renderChartPaginas(pages);
+    }
+  } catch(e) { setStatus('err', 'No se pudo conectar'); }
+}
+
+function renderTabla(pages) {
+  const max = Math.max.apply(null, pages.map(p => p.views).concat([1]));
+  document.getElementById('pages-body').innerHTML = pages.sort((a,b)=>b.views-a.views).map(p => {
+    const pct = Math.round((p.views/max)*100);
+    const lbl = p.page.length > 40 ? p.page.slice(0,40) + '…' : p.page;
+    return '<tr><td>' + lbl + '</td><td style="text-align:right;font-weight:600;">' + p.views + '</td><td><div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%"></div></div></td></tr>';
+  }).join('');
+}
+
+function renderChartPaginas(pages) {
+  const top = pages.slice(0, 8);
+  if (charts.paginas) charts.paginas.destroy();
+  charts.paginas = new Chart(document.getElementById('chartPaginas'), {
+    type: 'bar',
+    data: { labels: top.map(p => p.page.replace(/^\//,'').slice(0,18) || 'Inicio'), datasets: [{ data: top.map(p=>p.views), backgroundColor: '#C39A56', borderRadius: 5 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#bfa884', font: { size: 11 }, maxRotation: 30 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#bfa884', font: { size: 11 } }, grid: { color: 'rgba(221,193,151,0.07)' } }
+      }
+    }
+  });
+}
+
+async function loadFunnel(startDate) {
+  setStatus('wait', 'Cargando…');
+  try {
+    const data = await runReport({
+      dateRanges: [{ startDate: startDate, endDate: 'today' }],
+      dimensions: [{ name: 'pagePath' }],
+      metrics: [{ name: 'totalUsers' }],
+      limit: 200
+    });
+    if (data.error) { setStatus('err', 'Error: ' + data.error.message); return; }
+
+    const counts = {};
+    (data.rows || []).forEach(r => {
+      const p = r.dimensionValues[0].value.split('?')[0].replace(/\/$/, '') || '/';
+      counts[p] = (counts[p] || 0) + (+r.metricValues[0].value);
+    });
+    const get = key => counts[PATHS[key].replace(/\/$/, '') || '/'] || 0;
+
+    renderFunnel(get);
+    const total = Object.values(counts).reduce((a,b)=>a+b,0);
+    if (total === 0) setStatus('wait', 'Sin datos aún (GA4 procesa en 24-48h)');
+    else setStatus('live', 'Conectado en vivo');
+  } catch(e) { setStatus('err', 'No se pudo conectar'); }
+}
+
+function convClass(pct) { return pct >= 40 ? 'conv-good' : pct >= 15 ? 'conv-mid' : 'conv-low'; }
+
+function stepHTML(name, path, users, maxUsers, color) {
+  const pct = maxUsers > 0 ? Math.round((users/maxUsers)*100) : 0;
+  return '<div class="step">' +
+    '<div class="step-info"><div class="step-name">' + name + '</div><div class="step-path">' + path + '</div></div>' +
+    '<div class="step-num"><div class="step-users">' + users.toLocaleString('es-CO') + '</div><div class="step-users-lbl">usuarios</div></div>' +
+    '<div class="step-bar-wrap"><div class="step-bar-bg"><div class="step-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div></div>' +
+    '</div>';
+}
+
+function convHTML(from, to) {
+  if (from === 0) return '<div class="conv-row">—</div>';
+  const pct = Math.round((to/from)*100);
+  return '<div class="conv-row"><span>conversión</span><span class="conv-pill ' + convClass(pct) + '">' + pct + '%</span><span>(' + to.toLocaleString('es-CO') + ' de ' + from.toLocaleString('es-CO') + ')</span></div>';
+}
+
+function renderFunnel(get) {
+  const home = get('home');
+  const GOLD = '#C39A56', BROWN = '#8B6B3A';
+
+  const acel = get('acel'), form = get('form'), califica = get('califica'), nocal = get('nocalifica');
+  let b1 = stepHTML('Home', PATHS.home, home, home, GOLD);
+  b1 += convHTML(home, acel);
+  b1 += stepHTML('Ruta aceleradora', PATHS.acel, acel, home, GOLD);
+  b1 += convHTML(acel, form);
+  b1 += stepHTML('Formulario (aplican)', PATHS.form, form, home, GOLD);
+  b1 += convHTML(form, califica);
+  b1 += stepHTML('Califica (lead bueno)', PATHS.califica, califica, home, GOLD);
+  b1 += convHTML(form, nocal);
+  b1 += stepHTML('No califica (oferta $13.99)', PATHS.nocalifica, nocal, home, GOLD);
+  document.getElementById('branch-1').innerHTML = b1;
+
+  const master = get('master'), venta = get('ventamaster');
+  let b2 = stepHTML('Home', PATHS.home, home, home, BROWN);
+  b2 += convHTML(home, master);
+  b2 += stepHTML('Ruta masterclass', PATHS.master, master, home, BROWN);
+  b2 += convHTML(master, venta);
+  b2 += stepHTML('Venta masterclass (oferta $13.99)', PATHS.ventamaster, venta, home, BROWN);
+  document.getElementById('branch-2').innerHTML = b2;
+
+  const compra = get('compra');
+  const ofertas = nocal + venta;
+  const convCompra = ofertas > 0 ? Math.round((compra/ofertas)*100) : 0;
+  const convHome = home > 0 ? ((compra/home)*100).toFixed(1) : 0;
+  document.getElementById('outcomes').innerHTML =
+    '<div class="oc" style="border-left-color:#9bbf6a;"><div class="oc-lbl">Leads calificados</div><div class="oc-val">' + califica.toLocaleString('es-CO') + '</div></div>' +
+    '<div class="oc" style="border-left-color:#9bbf6a;"><div class="oc-lbl">Compras $13.99 (total)</div><div class="oc-val">' + compra.toLocaleString('es-CO') + '</div></div>' +
+    '<div class="oc" style="border-left-color:#d6a93f;"><div class="oc-lbl">Conv. oferta -> compra</div><div class="oc-val">' + convCompra + '%</div></div>' +
+    '<div class="oc" style="border-left-color:#C39A56;"><div class="oc-lbl">Conv. Home -> compra</div><div class="oc-val">' + convHome + '%</div></div>';
+
+  document.getElementById('funnel-note').innerHTML = 'Las compras ($13.99) llegan a una sola pagina de gracias compartida por ambas rutas, asi que el total no se separa automaticamente entre "no califica" y "venta masterclass". La conversion oferta -> compra se calcula sobre la suma de quienes vieron ambas ofertas (' + ofertas.toLocaleString('es-CO') + ' usuarios). Para separarlas, usa paginas de gracias distintas por ruta.';
+}
+
+loadTrafico('today');
+setInterval(() => {
+  const traficoVisible = !document.getElementById('view-trafico').classList.contains('hidden');
+  if (traficoVisible) loadTrafico(currentTraficoStart);
+  else loadFunnel(currentFunnelStart);
+}, 60000);
+</script>
+</body>
+</html>
