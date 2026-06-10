@@ -196,16 +196,43 @@ const PATHS = {
 let charts = {};
 let currentTraficoStart = 'today';
 let currentFunnelStart = '7daysAgo';
+let jsonpCounter = 0;
 
 function setStatus(type, text) {
   document.getElementById('status-dot').className = 'dot ' + type;
   document.getElementById('status-text').textContent = text;
 }
 
-async function apiGet(tipo, inicio) {
-  const url = API_URL + '?tipo=' + tipo + '&inicio=' + inicio;
-  const res = await fetch(url);
-  return res.json();
+function apiGet(tipo, inicio) {
+  return new Promise(function(resolve, reject) {
+    const cbName = 'jsonp_cb_' + (++jsonpCounter) + '_' + Date.now();
+    const script = document.createElement('script');
+    let done = false;
+
+    const cleanup = function() {
+      if (window[cbName]) { try { delete window[cbName]; } catch(e) { window[cbName] = undefined; } }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    window[cbName] = function(data) {
+      done = true;
+      cleanup();
+      resolve(data);
+    };
+
+    const timer = setTimeout(function() {
+      if (!done) { cleanup(); reject(new Error('timeout')); }
+    }, 20000);
+
+    script.onerror = function() {
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error('script error'));
+    };
+
+    script.src = API_URL + '?tipo=' + encodeURIComponent(tipo) + '&inicio=' + encodeURIComponent(inicio) + '&callback=' + cbName;
+    document.body.appendChild(script);
+  });
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
