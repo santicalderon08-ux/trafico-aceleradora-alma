@@ -180,8 +180,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-const API_KEY = 'AIzaSyBInBDSk9grRk9qZXVilzJOmz64Xwz7paQ';
-const PROPERTY_ID = '446634947';
+const API_URL = 'https://script.google.com/macros/s/AKfycbz1BmqzvZrYpJ-JGdvz9mf3soDc9aPsT8fvLXZrYDdG9-7tGC57yreMOG2EJBIRNRSI/exec';
 
 const PATHS = {
   home: '/',
@@ -203,9 +202,9 @@ function setStatus(type, text) {
   document.getElementById('status-text').textContent = text;
 }
 
-async function runReport(body) {
-  const url = 'https://analyticsdata.googleapis.com/v1beta/properties/' + PROPERTY_ID + ':runReport?key=' + API_KEY;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function apiGet(tipo, inicio) {
+  const url = API_URL + '?tipo=' + tipo + '&inicio=' + inicio;
+  const res = await fetch(url);
   return res.json();
 }
 
@@ -239,20 +238,12 @@ document.querySelectorAll('#range-funnel .rb').forEach(btn => {
 async function loadTrafico(startDate) {
   setStatus('wait', 'Cargando…');
   try {
-    const data = await runReport({
-      dateRanges: [{ startDate: startDate, endDate: 'today' }],
-      dimensions: [{ name: 'pagePath' }],
-      metrics: [{name:'activeUsers'},{name:'sessions'},{name:'screenPageViews'},{name:'averageSessionDuration'}],
-      limit: 20
-    });
-    if (data.error) { setStatus('err', 'Error de conexión'); return; }
+    const data = await apiGet('trafico', startDate);
+    if (data.error) { setStatus('err', 'Error: ' + data.error); return; }
 
-    let tU=0,tS=0,tV=0,tD=0; const pages=[];
-    (data.rows || []).forEach(r => {
-      const u=+r.metricValues[0].value, s=+r.metricValues[1].value, v=+r.metricValues[2].value, d=+r.metricValues[3].value;
-      tU+=u; tS+=s; tV+=v; tD+=d;
-      pages.push({ page: r.dimensionValues[0].value, views: v });
-    });
+    const pages = data.pages || [];
+    let tU=0,tS=0,tV=0,tD=0;
+    pages.forEach(p => { tU+=p.users; tS+=p.sessions; tV+=p.views; tD+=p.duration; });
 
     const avgD = tS > 0 ? tD/tS : 0;
     document.getElementById('m-users').textContent = tU.toLocaleString('es-CO');
@@ -272,8 +263,9 @@ async function loadTrafico(startDate) {
 }
 
 function renderTabla(pages) {
-  const max = Math.max.apply(null, pages.map(p => p.views).concat([1]));
-  document.getElementById('pages-body').innerHTML = pages.sort((a,b)=>b.views-a.views).map(p => {
+  const sorted = pages.slice().sort((a,b)=>b.views-a.views);
+  const max = Math.max.apply(null, sorted.map(p => p.views).concat([1]));
+  document.getElementById('pages-body').innerHTML = sorted.map(p => {
     const pct = Math.round((p.views/max)*100);
     const lbl = p.page.length > 40 ? p.page.slice(0,40) + '…' : p.page;
     return '<tr><td>' + lbl + '</td><td style="text-align:right;font-weight:600;">' + p.views + '</td><td><div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%"></div></div></td></tr>';
@@ -281,7 +273,7 @@ function renderTabla(pages) {
 }
 
 function renderChartPaginas(pages) {
-  const top = pages.slice(0, 8);
+  const top = pages.slice().sort((a,b)=>b.views-a.views).slice(0, 8);
   if (charts.paginas) charts.paginas.destroy();
   charts.paginas = new Chart(document.getElementById('chartPaginas'), {
     type: 'bar',
@@ -299,19 +291,10 @@ function renderChartPaginas(pages) {
 async function loadFunnel(startDate) {
   setStatus('wait', 'Cargando…');
   try {
-    const data = await runReport({
-      dateRanges: [{ startDate: startDate, endDate: 'today' }],
-      dimensions: [{ name: 'pagePath' }],
-      metrics: [{ name: 'totalUsers' }],
-      limit: 200
-    });
-    if (data.error) { setStatus('err', 'Error: ' + data.error.message); return; }
+    const data = await apiGet('funnel', startDate);
+    if (data.error) { setStatus('err', 'Error: ' + data.error); return; }
 
-    const counts = {};
-    (data.rows || []).forEach(r => {
-      const p = r.dimensionValues[0].value.split('?')[0].replace(/\/$/, '') || '/';
-      counts[p] = (counts[p] || 0) + (+r.metricValues[0].value);
-    });
+    const counts = data.counts || {};
     const get = key => counts[PATHS[key].replace(/\/$/, '') || '/'] || 0;
 
     renderFunnel(get);
